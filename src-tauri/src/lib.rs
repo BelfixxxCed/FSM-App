@@ -157,6 +157,7 @@ impl Pomodoro {
                     })
                 } else if self.sessions_done % 4 == 0 {
                     self.session_duration_secs = 15 * 60;
+                    self.session_start = Some(Instant::now()); 
                     self.state = States::LongBreak;
                     self.start_timer_task(app_handle.clone());
                     Ok(ReturnState {
@@ -169,6 +170,7 @@ impl Pomodoro {
                     })
                 } else {
                     self.session_duration_secs = 5 * 60;
+                    self.session_start = Some(Instant::now());
                     self.state = States::Break;
                     self.start_timer_task(app_handle.clone());
                     Ok(ReturnState {
