@@ -1,12 +1,9 @@
 use std::time::{Duration, Instant};
 use std::sync::Mutex;
-use tauri::{State, Manager};
+use tauri::State;
 use serde::{Serialize, Deserialize};
 use tauri::Emitter;
 use tauri_plugin_notification::NotificationExt;
-use rodio::{Sink, Source, Decoder};
-use std::fs::File;
-use std::io::BufReader;
 
 #[cfg(target_os = "android")]
 use tauri_plugin_haptics::HapticsExt;
@@ -352,61 +349,6 @@ impl Pomodoro {
     }
 }
 
-/// Plays a sound file located in the app's resource directory by name.
-/// Supported names: "bell", "piano", "bird", "chime"
-/// If the file cannot be found or decoded, falls back to a simple beep.
-#[tauri::command]
-fn play_sound(name: String, app_handle: tauri::AppHandle) -> Result<(), String> {
-    std::thread::spawn(move || {
-        // Determine the resource dir - try several strategies
-        let sound_path = std::path::PathBuf::from("sounds").join(format!("{}.mp3", name));
-        
-        // Try playing the MP3 file
-        if let Ok(file) = File::open(&sound_path) {
-            let reader = BufReader::new(file);
-            if let Ok(source) = Decoder::new(reader) {
-                if let Ok((_stream, stream_handle)) = rodio::OutputStream::try_default() {
-                    if let Ok(sink) = Sink::try_new(&stream_handle) {
-                        sink.append(source);
-                        sink.sleep_until_end();
-                        return;
-                    }
-                }
-            }
-        }
-        
-        // Also try resource path via resource_dir
-        if let Ok(resource_dir) = app_handle.path().resource_dir() {
-            let res_path = resource_dir.join("sounds").join(format!("{}.mp3", name));
-            if let Ok(file) = File::open(&res_path) {
-                let reader = BufReader::new(file);
-                if let Ok(source) = Decoder::new(reader) {
-                    if let Ok((_stream, stream_handle)) = rodio::OutputStream::try_default() {
-                        if let Ok(sink) = Sink::try_new(&stream_handle) {
-                            sink.append(source);
-                            sink.sleep_until_end();
-                            return;
-                        }
-                    }
-                }
-            }
-        }
-        
-        // Fallback: simple beep
-        if let Ok((_stream, stream_handle)) = rodio::OutputStream::try_default() {
-            if let Ok(sink) = Sink::try_new(&stream_handle) {
-                for freq in [523.0, 659.0, 784.0] {
-                    let beep = rodio::source::SineWave::new(freq)
-                        .take_duration(Duration::from_millis(200))
-                        .amplify(0.6);
-                    sink.append(beep);
-                }
-                sink.sleep_until_end();
-            }
-        }
-    });
-    Ok(())
-}
 
 fn minutes_to_sessions_calc(mins: u32, duration_per_session: &mut Duration, num_sessions: &mut u32) {
     let mut session_iterator: u32 = 1;
@@ -490,7 +432,6 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             do_action,
             get_remaining,
-            play_sound,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

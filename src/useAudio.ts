@@ -29,6 +29,8 @@ export function useAudio() {
   const previewTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Currently looping break music
   const breakMusicRef = useRef<HTMLAudioElement | null>(null);
+  // Persist timer-end audio elements so GC doesn't collect them mid-playback
+  const timerEndRefs = useRef<HTMLAudioElement[]>([]);
 
   /** Play a single preview of the given sound, limited to 10 seconds. */
   const playPreview = useCallback((sound: TimerSound, volume: number) => {
@@ -71,7 +73,16 @@ export function useAudio() {
       const path = SOUND_PATHS[sound];
       if (!path) return;
       const audio = makeAudio(path, volume);
-      audio.play().catch(() => {});
+      // Track in ref so GC doesn't collect it during playback
+      timerEndRefs.current.push(audio);
+      audio.addEventListener("ended", () => {
+        const idx = timerEndRefs.current.indexOf(audio);
+        if (idx !== -1) timerEndRefs.current.splice(idx, 1);
+      });
+      audio.play().catch(() => {
+        const idx = timerEndRefs.current.indexOf(audio);
+        if (idx !== -1) timerEndRefs.current.splice(idx, 1);
+      });
     },
     []
   );

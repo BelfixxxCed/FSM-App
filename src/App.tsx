@@ -107,17 +107,12 @@ export default function App() {
     saveSettings(settings)
   }, [settings])
 
-
-
   function startTick() {
     stopTick()
     tickRef.current = setInterval(async () => {
       try {
         const secs = await invoke<number>("get_remaining")
         setDisplay(fmt(secs))
-        if (secs <= 0) {
-          handleTimerComplete()
-        }
       } catch (_) {}
     }, 1000)
   }
@@ -129,13 +124,8 @@ export default function App() {
     }
   }
 
-  // ── Timer complete handler ──────────────────────────────────────────────────
-  const lastZeroRef = useRef(false)
-
+  // ── Timer complete handler (sound + confetti + break music) ────────────────
   function handleTimerComplete() {
-    if (lastZeroRef.current) return
-    lastZeroRef.current = true
-
     // Play timer-end sound via the frontend (respects user's selected sound)
     if (settings.playTimerSound) {
       playTimerEnd(settings.timerSound, true, settings.volume)
@@ -162,7 +152,6 @@ export default function App() {
 
     const isRunning = rs.state === "Session" || rs.state === "Break" || rs.state === "LongBreak"
     if (isRunning) {
-      lastZeroRef.current = false
       startTick()
     } else {
       stopTick()
@@ -178,6 +167,10 @@ export default function App() {
 
     listen("timer-finished", async () => {
       try {
+        // First, handle all timer-complete effects (sound, confetti, break music)
+        handleTimerComplete()
+
+        // Then transition state on the backend — this starts a new timer for break/session
         const rs = await invoke<ReturnState>("do_action", { action: { SessionComplete: null } })
         applyReturnState(rs)
       } catch (e) {
@@ -189,7 +182,7 @@ export default function App() {
       unlisten?.()
       stopTick()
     }
-  }, [])
+  }, [settings.playTimerSound, settings.timerSound, settings.volume, settings.playBreakMusic])
 
   async function handlePlay() {
     stopBreakMusic()
